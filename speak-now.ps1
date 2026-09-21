@@ -11,12 +11,20 @@
 #>
 $ErrorActionPreference = 'Continue'
 $Root    = $PSScriptRoot
-if (-not $Root) { $Root = 'C:\Users\anshu\Desktop\Claude\daily-overview' }
+if (-not $Root -and $MyInvocation.MyCommand.Path) { $Root = Split-Path -Parent $MyInvocation.MyCommand.Path }
+if (-not $Root) { $Root = (Get-Location).Path }
+. (Join-Path $Root 'paths.ps1')
 $Latest  = Join-Path $Root 'latest.json'
 $Layout  = Join-Path $Root 'layout.json'
 $Mp3     = Join-Path $Root '_speaknow.mp3'
-$PyDir   = 'C:\Users\anshu\AppData\Local\Programs\Python\Python313'
-$Edge    = Join-Path $PyDir 'Scripts\edge-tts.exe'
+# edge-tts.exe: on PATH first, else in the Scripts folder next to the resolved Python.
+$Edge    = $null
+$edgeCmd = Get-Command edge-tts.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($edgeCmd) { $Edge = $edgeCmd.Source }
+else {
+  $pyExe = (Resolve-PythonExe).Python
+  if ($pyExe) { $Edge = Join-Path (Split-Path -Parent $pyExe) 'Scripts\edge-tts.exe' }
+}
 $DefaultVoice = 'en-GB-RyanNeural'
 
 if (-not (Test-Path $Latest)) {
@@ -58,7 +66,7 @@ function Play-Mp3Blocking([string]$path) {
 
 $spoke = $false
 try {
-  if (Test-Path $Edge) {
+  if ($Edge -and (Test-Path $Edge)) {
     if (Test-Path $Mp3) { Remove-Item $Mp3 -Force -ErrorAction SilentlyContinue }
     & $Edge --voice $voice --rate=+6% --text $text --write-media $Mp3 2>$null | Out-Null
     if ((Test-Path $Mp3) -and (Get-Item $Mp3).Length -gt 0) {
