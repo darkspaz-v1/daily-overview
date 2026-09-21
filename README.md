@@ -1,5 +1,7 @@
 # Daily Overview
 
+[![CI](https://github.com/darkspaz-v1/daily-overview/actions/workflows/ci.yml/badge.svg)](https://github.com/darkspaz-v1/daily-overview/actions/workflows/ci.yml)
+
 A desktop dashboard and voice briefing for the day — weather, tasks, and class deadlines, from one
 markdown planner.
 
@@ -37,20 +39,47 @@ handle as "not running" is what produces duplicate windows.
 `planner.md`. Hand-written items outside the markers are never touched, which is what makes it safe to
 re-run.
 
-## Running it
+## Install and run
 
 ```
+pip install -r requirements.txt        # pywebview, requests, sounddevice, SpeechRecognition, edge-tts
 run-app.ps1        # desktop app
 Daily Overview.cmd # dashboard
 ```
 
-Windows only — PowerShell, Win32 APIs, and SAPI voices.
+Windows only: PowerShell, Win32 APIs, and SAPI voices. Nothing is tied to one machine. Paths resolve in
+this order: environment variable, then PATH or next to the script, then a `%USERPROFILE%` default.
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `DAILY_OVERVIEW_PYTHON` | full path to the `python.exe` used by `run-app.ps1` and `speak-now.ps1` | `pythonw` on PATH, then `py -3` |
+| `CLAUDE_CLI` | full path to `claude.cmd` for the weekly AI research | `claude.cmd` on PATH, then `%APPDATA%\npm\claude.cmd` |
+| `SHORTSFORGE_DIR` | the ShortsForge project folder shown in the briefing | `%USERPROFILE%\AI Agents` |
+
+The `.vbs` launchers find their `.ps1` next to themselves, so the folder can live anywhere.
+
+## Tests
+
+```
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+Tests run against fake planner and schedule fixtures written to a temp folder. They never touch a real
+`planner.md`.
+
+## Troubleshooting
+
+The desktop app runs under `pythonw`, so errors do not appear in a console. They are written to
+`logs/daily-overview.log` (rotating, next to `overview_app.py`). The scheduled research scripts log to
+`money\run.log` and `ai-research\run.log`.
 
 ## Note on contents
 
-`class-deadlines.md`, `class-schedule.md` and `effort.md` are this author's real Fall 2026 coursework
-data, kept in-repo because the scripts read them. They are schedule information, not credentials.
-`planner.md` and all generated `latest.*` output are gitignored.
+`planner.md`, `class-deadlines.md`, `class-schedule.md`, `effort.md` and all generated `latest.*`
+output are personal, gitignored files you create yourself (`plan-day.py` and `sync-classes.ps1` expect
+the three class files beside them). A minimal `planner.md` has `## Recurring`, `## Scheduled`
+(`- 2026-01-31 09:30 Team standup`) and `## Tasks` (`- [ ] Buy milk (due: 2026-02-01)`) sections.
 
 ## License
 

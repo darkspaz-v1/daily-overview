@@ -168,7 +168,7 @@ def test_fill_splits_long_work_and_reports_unplaced(plan_day):
     assert sum(s.end - s.start for s in sessions if s.label == "big") == 120
     assert unplaced and unplaced[0][0].label == "huge"      # what doesn't fit is reported
     spans = [(s.start, s.end) for s in sessions]
-    assert all(a[1] <= b[0] for a, b in zip(spans, spans[1:]))  # sessions never overlap
+    assert all(a[1] <= b[0] for a, b in zip(spans, spans[1:], strict=False))  # sessions never overlap
 
 
 def test_fill_drops_gaps_smaller_than_min_session(plan_day):
