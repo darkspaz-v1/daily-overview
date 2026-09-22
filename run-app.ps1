@@ -25,7 +25,7 @@ try {
       -ArgumentList @('-NoProfile','-WindowStyle','Hidden','-ExecutionPolicy','Bypass','-File',"`"$money`"") `
       -WorkingDirectory $Root -WindowStyle Hidden
   }
-} catch {}
+} catch { Write-Verbose "Could not start background money research: $($_.Exception.Message)" }
 
 # Kick off the weekly AI research in the background (hidden).
 # It self-guards to once per week (week-of-Monday stamped, regardless of which
@@ -38,4 +38,4 @@ try {
       -ArgumentList @('-NoProfile','-WindowStyle','Hidden','-ExecutionPolicy','Bypass','-File',"`"$aiResearch`"") `
       -WorkingDirectory $Root -WindowStyle Hidden
   }
-} catch {}
+} catch { Write-Verbose "Could not start background AI research: $($_.Exception.Message)" }

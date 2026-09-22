@@ -5,7 +5,7 @@
 
 A Windows dashboard and voice briefing that turns one hand-edited markdown planner into today's weather, tasks, and schedule.
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Privacy boundary](#privacy-boundary) · [Tests](#tests)
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Known limitations](#known-limitations) · [Privacy boundary](#privacy-boundary) · [Tests](#tests)
 
 ![Daily Overview dashboard rendered from the example planner: weather panel, task queue with overdue, scheduled and due-today items, and a side-project status panel. All data is invented.](docs/media/dashboard-example.png)
 
@@ -52,6 +52,18 @@ _Architecture diagram, not a screenshot._ `planner.md` is the only thing you edi
 weather forecast (IP geolocation via ipinfo.io, forecast from open-meteo) and project status, and writes three output
 files. `dashboard.html` reads `latest.js`; `overview_app.py` hosts the same dashboard in a pywebview window and re-runs the
 engine on launch; `speak-now.ps1` speaks the `summary` field of `latest.json`.
+
+## Known limitations
+
+- **Windows + PowerShell only.** The engine, launchers and voice pieces are PowerShell/Win32; there is no macOS or
+  Linux path.
+- **Weather location is IP-based, not GPS.** `daily-overview.ps1` geolocates from your public IP (ipinfo.io, falling
+  back to ip-api.com), so the place name and forecast are only as accurate as that lookup — usually city-level, not
+  precise.
+- **Voice/speech is optional and platform-specific.** `speak-now.ps1` needs `edge-tts` (falls back to Windows SAPI
+  via `System.Speech`, itself Windows-only) and is not required for the dashboard or the engine to work.
+- **No mobile support.** `dashboard.html` is a desktop-oriented local file; there is no responsive mobile layout or
+  packaged mobile app.
 
 ## Privacy boundary
 

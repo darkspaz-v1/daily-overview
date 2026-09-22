@@ -29,7 +29,7 @@ $DefaultVoice = 'en-GB-RyanNeural'
 
 if (-not (Test-Path $Latest)) {
   # No briefing generated yet -- refresh it once so there's something to say.
-  try { & powershell -ExecutionPolicy Bypass -File (Join-Path $Root 'daily-overview.ps1') -Quiet | Out-Null } catch {}
+  try { & powershell -ExecutionPolicy Bypass -File (Join-Path $Root 'daily-overview.ps1') -Quiet | Out-Null } catch { Write-Verbose "Could not refresh the briefing before speaking: $($_.Exception.Message)" }
 }
 if (-not (Test-Path $Latest)) { exit }
 
@@ -37,7 +37,7 @@ $text = ''
 try {
   $data = Get-Content $Latest -Raw -Encoding UTF8 | ConvertFrom-Json
   $text = [string]$data.summary
-} catch {}
+} catch { Write-Verbose "Could not read summary from $Latest : $($_.Exception.Message)" }
 if (-not $text) { $text = 'Systems online. No briefing available right now.' }
 
 $voice = $DefaultVoice
@@ -45,7 +45,7 @@ if (Test-Path $Layout) {
   try {
     $st = Get-Content $Layout -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($st.voice) { $voice = [string]$st.voice }
-  } catch {}
+  } catch { Write-Verbose "Could not read voice from $Layout : $($_.Exception.Message)" }
 }
 
 function Play-Mp3Blocking([string]$path) {
@@ -74,7 +74,7 @@ try {
       $spoke = $true
     }
   }
-} catch {}
+} catch { Write-Verbose "edge-tts failed, falling back to SAPI: $($_.Exception.Message)" }
 
 if (-not $spoke) {
   # Offline fallback: native Windows SAPI voice, blocking.
@@ -82,5 +82,5 @@ if (-not $spoke) {
     Add-Type -AssemblyName System.Speech
     $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
     $synth.Speak($text)
-  } catch {}
+  } catch { Write-Verbose "SAPI speech failed: $($_.Exception.Message)" }
 }

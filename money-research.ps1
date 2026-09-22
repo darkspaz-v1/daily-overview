@@ -27,7 +27,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { Write-Verbose "Could not set TLS 1.2 (older PowerShell/.NET): $($_.Exception.Message)" }
 
 $Root     = Split-Path -Parent $MyInvocation.MyCommand.Path
 $OutDir   = Join-Path $Root 'money'
@@ -83,7 +83,7 @@ try {
       if (-not $j.position) { continue }
       $tags = @($j.tags) -join ', '
       $when = ''
-      try { if ($j.date) { $when = ([datetime]$j.date).ToString('yyyy-MM-dd') } } catch {}
+      try { if ($j.date) { $when = ([datetime]$j.date).ToString('yyyy-MM-dd') } } catch { Write-Verbose "Could not parse RemoteOK date '$($j.date)': $($_.Exception.Message)" }
       AddOpp @{
         type='freelance'; title=[string]$j.position; org=[string]$j.company
         url=[string]$j.url; tags=$tags; source='RemoteOK'
@@ -107,7 +107,7 @@ foreach ($q in $hnQueries) {
         if (-not $h.title) { continue }
         $link = if ($h.url) { [string]$h.url } else { "https://news.ycombinator.com/item?id=$($h.objectID)" }
         $when = ''
-        try { $when = ([datetime]$h.created_at).ToString('yyyy-MM-dd') } catch {}
+        try { $when = ([datetime]$h.created_at).ToString('yyyy-MM-dd') } catch { Write-Verbose "Could not parse HN created_at '$($h.created_at)': $($_.Exception.Message)" }
         AddOpp @{
           type='signal'; title=[string]$h.title; org=("HN " + [string]$h.points + " pts")
           url=$link; tags=$q; source='Hacker News'; posted=$when; salary=''
@@ -130,7 +130,7 @@ function Score($o) {
       $d = [datetime]$o.posted
       $age = ($Now.Date - $d.Date).Days
       if ($age -le 3) { $s += 4 } elseif ($age -le 7) { $s += 2 } elseif ($age -le 14) { $s += 1 }
-    } catch {}
+    } catch { Write-Verbose "Could not parse posted date '$($o.posted)' for scoring: $($_.Exception.Message)" }
   }
   return $s
 }

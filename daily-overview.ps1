@@ -21,7 +21,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { Write-Verbose "Could not set TLS 1.2 (older PowerShell/.NET): $($_.Exception.Message)" }
 
 $Root        = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PlannerPath = Join-Path $Root 'planner.md'
@@ -81,7 +81,7 @@ try {
   try {
     $geo = Invoke-RestMethod 'https://ipinfo.io/json' -TimeoutSec 15
     if ($geo.loc) { $lat,$lon = $geo.loc -split ','; $place = (@($geo.city,$geo.region,$geo.country) | Where-Object { $_ }) -join ', ' }
-  } catch {}
+  } catch { Write-Verbose "ipinfo.io geolocation failed, falling back to ip-api.com: $($_.Exception.Message)" }
   if (-not $lat) {
     $g2 = Invoke-RestMethod 'http://ip-api.com/json/' -TimeoutSec 15
     $lat = $g2.lat; $lon = $g2.lon
@@ -217,7 +217,7 @@ try {
       Where-Object { $_.LastWriteTime -gt $Now.AddDays(-3) -and $_.FullName -notmatch $skip } |
       Sort-Object LastWriteTime -Descending)
     $ollamaUp = $false
-    try { $null = Invoke-RestMethod 'http://localhost:11434/api/tags' -TimeoutSec 3; $ollamaUp = $true } catch {}
+    try { $null = Invoke-RestMethod 'http://localhost:11434/api/tags' -TimeoutSec 3; $ollamaUp = $true } catch { Write-Verbose "Ollama not reachable on localhost:11434: $($_.Exception.Message)" }
 
     $recentList = @()
     foreach ($p in ($projects | Select-Object -First 3)) {
@@ -320,7 +320,7 @@ if ($Opp -and $Opp.count -gt 0) {
 }
 if ($AiR -and $AiR.headline) {
   $airAgeDays = 999
-  try { $airAgeDays = [int]((New-TimeSpan -Start ([datetime]$AiR.generatedAt) -End $Now).TotalDays) } catch {}
+  try { $airAgeDays = [int]((New-TimeSpan -Start ([datetime]$AiR.generatedAt) -End $Now).TotalDays) } catch { Write-Verbose "Could not parse AI research generatedAt date, treating it as stale: $($_.Exception.Message)" }
   if ($airAgeDays -le 8) {
     [void]$parts.Add("This week's AI research: $(Clean $AiR.headline)")
   }
@@ -466,6 +466,6 @@ if ($Notify) {
     $balloon.ShowBalloonTip(10000)
     Start-Sleep -Seconds 8
     $balloon.Dispose()
-  } catch {}
+  } catch { Write-Verbose "Could not show the tray notification: $($_.Exception.Message)" }
 }
-if ($Open) { try { Invoke-Item $todayFile } catch {} }
+if ($Open) { try { Invoke-Item $todayFile } catch { Write-Verbose "Could not open $todayFile : $($_.Exception.Message)" } }
