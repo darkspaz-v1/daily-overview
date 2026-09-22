@@ -110,7 +110,7 @@ try {
   $finished = $proc.WaitForExit(1200000)   # 20 minute cap
   if (-not $finished) {
     Note 'TIMEOUT: claude did not finish within 20 minutes -- killing process.'
-    try { $proc.Kill() } catch {}
+    try { $proc.Kill() } catch { Note "Could not kill timed-out claude process: $($_.Exception.Message)" }
   } else {
     Note "claude exit code = $($proc.ExitCode)"
   }

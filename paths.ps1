@@ -30,7 +30,7 @@ function Resolve-PythonExe {
             $py  = $exe
             $pyw = Join-Path (Split-Path -Parent $exe) 'pythonw.exe'
           }
-        } catch {}
+        } catch { Write-Verbose "py launcher could not resolve Python 3: $($_.Exception.Message)" }
       }
     }
     if (-not $py) {
