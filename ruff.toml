@@ -1,0 +1,11 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "B"]
+# overview_app.py deliberately keeps short if/elif branches and one-line guards on a single line,
+# and has two long prompt strings; rewriting working code for style is out of scope.
+ignore = ["E701", "E702"]
+
+[lint.per-file-ignores]
+"overview_app.py" = ["E401", "E501"]

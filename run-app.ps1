@@ -10,9 +10,10 @@
 #>
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $app  = Join-Path $Root 'overview_app.py'
-$pyw  = 'C:\Users\anshu\AppData\Local\Programs\Python\Python313\pythonw.exe'
-$py   = 'C:\Users\anshu\AppData\Local\Programs\Python\Python313\python.exe'
-$exe  = if (Test-Path $pyw) { $pyw } else { $py }
+. (Join-Path $Root 'paths.ps1')
+$pyInfo = Resolve-PythonExe
+$exe    = if ($pyInfo.Pythonw) { $pyInfo.Pythonw } else { $pyInfo.Python }
+if (-not $exe) { throw 'Python 3 not found. Install it, or set DAILY_OVERVIEW_PYTHON to the full path of python.exe.' }
 Start-Process -FilePath $exe -ArgumentList @("`"$app`"") -WorkingDirectory $Root
 
 # Kick off the daily money-opportunities research in the background (hidden).

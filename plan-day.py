@@ -385,7 +385,7 @@ def free_gaps(day_start: int, day_end: int, busy: list[Busy],
     buffer around every class."""
     blocked: list[tuple[int, int]] = []
     classes = [b for b in busy if b.kind == "class"]
-    for i, b in enumerate(busy):
+    for b in busy:
         lo, hi = b.start, b.end
         if b.kind == "class":
             first = classes and b is classes[0]

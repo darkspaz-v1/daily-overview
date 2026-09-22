@@ -10,6 +10,8 @@ Run:  pythonw overview_app.py     (no console)
 The Api class is import-safe (no window) so the logic can be tested headlessly.
 """
 import os, sys, json, base64, subprocess, datetime, re
+import logging
+from logging.handlers import RotatingFileHandler
 
 ROOT   = os.path.dirname(os.path.abspath(__file__))
 PLANNER = os.path.join(ROOT, "planner.md")
@@ -23,7 +25,27 @@ MODEL   = "llama3.1"
 VOICE   = "en-GB-RyanNeural"
 NOWIN   = 0x08000000  # CREATE_NO_WINDOW
 
-import requests  # already installed with shortsforge
+import requests  # noqa: E402  (kept beside the constants it configures)
+
+LOG_DIR = os.path.join(ROOT, "logs")
+log = logging.getLogger("daily_overview")
+log.addHandler(logging.NullHandler())  # importing this module stays silent; run_app() attaches the file
+
+
+def setup_logging():
+    """Send log records to logs/daily-overview.log (rotating, 3 x 512 KB). The app runs under
+    pythonw, where stderr goes nowhere, so this file is the only place errors show up."""
+    if any(isinstance(h, RotatingFileHandler) for h in log.handlers):
+        return
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        handler = RotatingFileHandler(os.path.join(LOG_DIR, "daily-overview.log"),
+                                      maxBytes=512 * 1024, backupCount=3, encoding="utf-8")
+    except OSError:
+        return  # read-only folder: run without a log file rather than fail to start
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    log.addHandler(handler)
+    log.setLevel(logging.INFO)
 
 # ---------------------------------------------------------------- planner store
 class Planner:
@@ -173,7 +195,9 @@ class Planner:
                 mm = re.match(r"^-\s*(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}:\d{2}))?\s+(.+)$", t)
                 if mm:
                     try: dd = datetime.date.fromisoformat(mm.group(1))
-                    except Exception: continue
+                    except ValueError:
+                        log.warning("planner.md: ignoring scheduled item with invalid date %r", mm.group(1))
+                        continue
                     tm, what = mm.group(2), mm.group(3).strip()
                     if dd == today: schedToday.append((tm + " - " if tm else "") + what)
                     elif today < dd <= today + datetime.timedelta(days=7):
@@ -187,7 +211,9 @@ class Planner:
                         due = dm.group(1); body = re.sub(r"\s*\(due:\s*\d{4}-\d{2}-\d{2}\)", "", body).strip()
                     if due:
                         try: dd = datetime.date.fromisoformat(due)
-                        except Exception: dd = None
+                        except ValueError:
+                            log.warning("planner.md: invalid due date %r on task %r", due, body)
+                            dd = None
                         if dd == today: dueToday.append(body)
                         elif dd and dd < today: overdue.append(body + " (was due " + due + ")")
                         else: opent.append(body + " (due " + due + ")")
@@ -262,7 +288,8 @@ class Api:
         try:
             with open(LATEST, encoding="utf-8-sig") as f:  # PowerShell writes a UTF-8 BOM
                 return json.load(f)
-        except Exception as ex:
+        except (OSError, ValueError) as ex:  # missing/unreadable file or bad JSON
+            log.warning("could not read %s: %s", LATEST, ex)
             return {"error": str(ex)}
 
     def refresh(self):
@@ -271,8 +298,8 @@ class Api:
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ENGINE, "-Quiet"],
                 cwd=ROOT, timeout=90, creationflags=NOWIN,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError) as ex:  # includes TimeoutExpired
+            log.warning("engine refresh failed, showing the last data: %s", ex)
         return self.get_data()
 
     # ---- direct task actions (for the in-app buttons) ----
@@ -297,7 +324,7 @@ class Api:
         args = args or {}
         if isinstance(args, str):
             try: args = json.loads(args)
-            except Exception: args = {"text": args}
+            except ValueError: args = {"text": args}  # model sent plain text instead of JSON
         if name == "add_task":      return self.planner.add_task(args.get("text"), args.get("due"))
         if name == "add_event":     return self.planner.add_event(args.get("date"), args.get("text"), args.get("time"))
         if name == "complete_task": return self.planner.complete_task(args.get("query"))
@@ -323,7 +350,8 @@ class Api:
         m = re.search(r"(\d{4}-\d{2}-\d{2})", s)
         if m:
             try: return datetime.date.fromisoformat(m.group(1))
-            except Exception: pass
+            except ValueError:
+                log.debug("get_weather: %r is not a real date, using today", m.group(1))
         return today
 
     def _resolve_hour(self, time):
@@ -430,7 +458,8 @@ class Api:
                         "actions": actions, "tasks": self.planner.categorized()}
             return {"reply": "I got a bit tangled up — could you rephrase that?",
                     "actions": actions, "tasks": self.planner.categorized()}
-        except Exception as ex:
+        except Exception as ex:  # noqa: BLE001 - UI boundary: network, bad JSON or a tool bug must become a chat reply, not a crash
+            log.exception("chat failed")
             return {"reply": f"(Could not reach the local AI: {ex}. Is Ollama running?)",
                     "actions": actions, "tasks": self.planner.categorized()}
 
@@ -451,8 +480,8 @@ class Api:
                     with open(mp3, "rb") as f:
                         b64 = base64.b64encode(f.read()).decode()
                     return {"audio": "data:audio/mp3;base64," + b64}
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError) as ex:
+            log.warning("edge-tts failed, falling back to Windows speech: %s", ex)
         # offline fallback: speak natively via Windows SAPI (killable via stop_speak)
         try:
             ps = ("Add-Type -AssemblyName System.Speech;"
@@ -461,10 +490,10 @@ class Api:
                                           stdin=subprocess.PIPE, text=True, creationflags=NOWIN)
             try:
                 self._sapi.communicate(text, timeout=60)
-            except Exception:
-                pass
-        except Exception:
-            pass
+            except (subprocess.TimeoutExpired, OSError, ValueError) as ex:
+                log.warning("Windows speech did not finish cleanly: %s", ex)
+        except OSError as ex:
+            log.warning("could not start Windows speech: %s", ex)
         return {"audio": None}
 
     def stop_speak(self):
@@ -472,16 +501,16 @@ class Api:
         try:
             if self._sapi and self._sapi.poll() is None:
                 self._sapi.terminate()
-        except Exception:
-            pass
+        except OSError as ex:
+            log.debug("stop_speak: %s", ex)  # process already gone; nothing to stop
         return {"ok": True}
 
     def toggle_fullscreen(self):
         try:
             if self._window:
                 self._window.toggle_fullscreen()
-        except Exception:
-            pass
+        except Exception as ex:  # noqa: BLE001 - pywebview backends raise assorted types; cosmetic feature, never fatal
+            log.debug("toggle_fullscreen failed: %s", ex)
         return {"ok": True}
 
     # ---- layout / theme persistence ----
@@ -492,7 +521,8 @@ class Api:
             with open(STATE, "w", encoding="utf-8") as f:
                 json.dump(state, f, indent=2)
             return {"ok": True}
-        except Exception as ex:
+        except (OSError, ValueError, TypeError) as ex:  # write failure, bad JSON, unserialisable value
+            log.warning("could not save %s: %s", STATE, ex)
             return {"ok": False, "error": str(ex)}
 
     def load_state(self):
@@ -500,8 +530,8 @@ class Api:
             if os.path.exists(STATE):
                 with open(STATE, encoding="utf-8") as f:
                     return json.load(f)
-        except Exception:
-            pass
+        except (OSError, ValueError) as ex:
+            log.warning("could not read %s, using defaults: %s", STATE, ex)
         return {}
 
     # ---- voice in ----
@@ -515,11 +545,13 @@ class Api:
             audio = sr.AudioData(rec.tobytes(), fs, 2)
             text = sr.Recognizer().recognize_google(audio)
             return {"text": text}
-        except Exception as ex:
+        except Exception as ex:  # noqa: BLE001 - audio device, SpeechRecognition and network errors all mean "no text"
+            log.warning("voice input failed: %s", ex)
             return {"text": "", "error": str(ex)}
 
 
 def run_app():
+    setup_logging()
     import webview
     api = Api()
     api.refresh()  # generate fresh latest.js/json before the window loads

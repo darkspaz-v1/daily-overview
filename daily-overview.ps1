@@ -26,7 +26,8 @@ try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::
 $Root        = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PlannerPath = Join-Path $Root 'planner.md'
 $OutDir      = Join-Path $Root 'overviews'
-$ProjectDir  = 'C:\Users\anshu\AI Agents'
+. (Join-Path $Root 'paths.ps1')
+$ProjectDir  = Resolve-ShortsForgeDir
 $Now         = Get-Date
 $TodayIso    = $Now.ToString('yyyy-MM-dd')
 New-Item -ItemType Directory -Force $OutDir | Out-Null
@@ -245,7 +246,7 @@ try {
     }
     $projBlock = $pb.ToString().TrimEnd()
   } else {
-    $projBlock = "_Project folder not found at $ProjectDir_"
+    $projBlock = "_Project folder not found at ${ProjectDir}_"
   }
 } catch {
   $projBlock = "_Could not read project status ($($_.Exception.Message))_"
@@ -380,7 +381,7 @@ $md | Out-File -FilePath $latestMd  -Encoding utf8
 # ================= CHANNEL PERFORMANCE =================
 $Ch = [ordered]@{ ok = $false; count = 0; videos = @(); pending = @() }
 try {
-  $agRoot = 'C:\Users\anshu\AI Agents'
+  $agRoot = $ProjectDir
   $perfFile = Join-Path $agRoot 'performance\videos.json'
   $vids = @()
   if (Test-Path $perfFile) {

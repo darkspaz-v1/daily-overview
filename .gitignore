@@ -17,3 +17,6 @@ opportunities.md
 class-deadlines.md
 class-schedule.md
 effort.md
+logs/
+.pytest_cache/
+.ruff_cache/

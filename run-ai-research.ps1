@@ -21,7 +21,7 @@ param([switch]$Force)
 $ErrorActionPreference = 'Continue'
 $Root = $PSScriptRoot
 if (-not $Root -and $MyInvocation.MyCommand.Path) { $Root = Split-Path -Parent $MyInvocation.MyCommand.Path }
-if (-not $Root -or -not (Test-Path (Join-Path $Root 'daily-overview.ps1'))) { $Root = 'C:\Users\anshu\Desktop\Claude\daily-overview' }
+if (-not $Root -or -not (Test-Path (Join-Path $Root 'daily-overview.ps1'))) { $Root = (Get-Location).Path }
 
 $AiDir      = Join-Path $Root 'ai-research'
 $ReportsDir = Join-Path $AiDir 'reports'
@@ -41,9 +41,10 @@ if (-not $Force -and (Test-Path $Stamp) -and ((Get-Content $Stamp -Raw).Trim() -
   return
 }
 
-$claudeExe = 'C:\Users\anshu\AppData\Roaming\npm\claude.cmd'
-if (-not (Test-Path $claudeExe)) {
-  Note "ERROR: claude CLI not found at $claudeExe -- skipping this run."
+. (Join-Path $Root 'paths.ps1')
+$claudeExe = Resolve-ClaudeCli
+if (-not $claudeExe) {
+  Note "ERROR: claude CLI not found (set CLAUDE_CLI, or put claude.cmd on PATH) -- skipping this run."
   return
 }
 

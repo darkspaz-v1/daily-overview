@@ -16,7 +16,7 @@ $ErrorActionPreference = 'Continue'
 # fall back to the known install path if anything is odd.
 $Root = $PSScriptRoot
 if (-not $Root -and $MyInvocation.MyCommand.Path) { $Root = Split-Path -Parent $MyInvocation.MyCommand.Path }
-if (-not $Root -or -not (Test-Path (Join-Path $Root 'money-research.ps1'))) { $Root = 'C:\Users\anshu\Desktop\Claude\daily-overview' }
+if (-not $Root -or -not (Test-Path (Join-Path $Root 'money-research.ps1'))) { $Root = (Get-Location).Path }
 $Log  = Join-Path $Root 'money\run.log'
 New-Item -ItemType Directory -Force (Join-Path $Root 'money') | Out-Null
 
